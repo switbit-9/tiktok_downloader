@@ -21,12 +21,10 @@ class BaseTiktokDownloader:
         self.api_key = ''
         self.search_keywords = ''
         self.username = ''
-        self.location = ''
         self.api_keys = self.load_api_keys()
-        self.filename = self.generate_random_uuid()
         self.channel_path = os.path.join(os.path.join(os.getcwd(), self.CHANNELS_FOLDER), channel)
 
-        self.download_by()
+        self.load_search_file()
 
     def load_api_keys(self):
         '''Read the list of tiktok api keys to fetch'''
@@ -35,13 +33,12 @@ class BaseTiktokDownloader:
         for secret in secrets:
             yield secret
 
-    def download_by(self):
+    def load_search_file(self):
         try:
             file_path = os.path.join(self.channel_path, self.SEARCH_BY_FILE)
             data = read_json_file(file_path)
             self.search_keywords = data.get('keywords', False)
             self.username = data.get('username', False)
-            self.location = data.get('location', False)
 
         except json.JSONDecodeError as e:
             print(e)
@@ -59,11 +56,12 @@ class BaseTiktokDownloader:
         # Define characters to be used (digits and uppercase letters)
         chars = string.digits + string.ascii_uppercase
         # Generate random characters for each section of the UUID
-        random_uuid = ''.join(random.choice(chars) for _ in range(8)) + '-'
-        random_uuid += ''.join(random.choice(chars) for _ in range(4)) + '-'
-        random_uuid += ''.join(random.choice(chars) for _ in range(4)) + '-'
-        random_uuid += ''.join(random.choice(chars) for _ in range(4)) + '-'
-        random_uuid += ''.join(random.choice(chars) for _ in range(12))
+        sections = [
+            ''.join(random.choice(chars) for _ in range(length))
+            for length in [8, 4, 4, 4, 12]
+        ]
+        # Join the sections with dashes to form the UUID
+        random_uuid = '-'.join(sections)
 
         return random_uuid
 
@@ -96,11 +94,19 @@ class TikTokDownloader(BaseTiktokDownloader):
                     print(f"Skipping : Video '{video_id}' already exists in TikTok")
                     continue
                 try:
-                    video_path = self.download_video(video_id, url)
-                    if video_path is None:
+                    generated_filename = self.generate_random_uuid()
+                    video_name = f"video_{random.randint(1, 10)}"
+                    downloaded_video = os.path.join(self.channel_path, f"first_{video_name}.mp4")
+                    if not self.download_video(url, downloaded_video):
                         continue
 
-                    video_data['video_path'] = video_path
+                    edited_video = os.path.join(self.channel_path, f"{generated_filename}.MOV")
+                    if not self.convert_video(downloaded_video, edited_video):
+                        continue
+                    self.add_metadata(edited_video)
+                    delete_video(downloaded_video)
+                    #Add Edited Video Path to video metadata
+                    video_data['video_path'] = edited_video
                     yield video_data
 
                 except Exception as e:
@@ -145,23 +151,16 @@ class TikTokDownloader(BaseTiktokDownloader):
             print(e)
             return []
 
-
-    def download_video(self, video_id, url):
+    def download_video(self, url, filename):
         try:
-            video_name = f"video_{random.randint(1, 10)}"
-            filename = os.path.join(self.channel_path, f"first_{video_name}.mp4")
-            output_filename = os.path.join(self.channel_path, f"{self.filename}.MOV")
-
             # Download the video and save it to a file
             urllib.request.urlretrieve(url, filename)
+            return True
             print(f"Video {video_id} downloaded!")
-            self.convert_video(filename, output_filename)
-            self.add_metadata(output_filename)
-            delete_video(filename)
-            return output_filename
 
         except Exception as e:
             print(e)
+            return False
 
     def is_video_in_db(self, video_id):
         video_db_path = os.path.join(self.channel_path, self.VIDEO_DB)
@@ -317,13 +316,15 @@ class TikTokDownloader(BaseTiktokDownloader):
             # 'vcodec' : 'libx265',
             # 'metadata' : self.map_metadata()ffmpe
         }
-        ffmpeg.input(input_file).output(output_file, **metadata).run(overwrite_output=True)
-
-
-
+        try:
+            ffmpeg.input(input_file).output(output_file, **metadata).run(overwrite_output=True)
+        except ffmpeg.Error as e:
+            return False
+            print(e)
 
     def add_metadata(self, file_path):
-        time.sleep(5)
+        #Add a sleep until video i generated
+        time.sleep(2)
         new_metadata = self.map_metadata()
         self.modify_metadata(file_path, new_metadata)
 
