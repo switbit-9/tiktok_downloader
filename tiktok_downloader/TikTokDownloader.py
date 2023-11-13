@@ -17,12 +17,12 @@ class BaseTiktokDownloader:
     SEARCH_BY_FILE = 'search.json'
 
 
-    def __init__(self, channel):
+    def __init__(self, channel_path):
         self.api_key = ''
-        self.search_keywords = ''
-        self.username = ''
+        self.search_by = ''
+        self.search = ''
         self.api_keys = self.load_api_keys()
-        self.channel_path = os.path.join(os.path.join(os.getcwd(), self.CHANNELS_FOLDER), channel)
+        self.channel_path = channel_path
 
         self.load_search_file()
 
@@ -37,8 +37,13 @@ class BaseTiktokDownloader:
         try:
             file_path = os.path.join(self.channel_path, self.SEARCH_BY_FILE)
             data = read_json_file(file_path)
-            self.search_keywords = data.get('keywords', False)
-            self.username = data.get('username', False)
+            search_by = data.get('search_by', False)
+            self.search_by = 'keywords' if search_by == 'keywords' else 'username'
+
+            if self.search_by == 'keywords':
+                self.search = data.get('keywords', False)
+            else:
+                self.search = data.get('username', False)
 
         except json.JSONDecodeError as e:
             print(e)
@@ -68,8 +73,8 @@ class BaseTiktokDownloader:
 class TikTokDownloader(BaseTiktokDownloader):
     VIDEO_DB = 'videos_db.json'
 
-    def __init__(self, channel):
-        super().__init__(channel)
+    def __init__(self, channel_path):
+        super().__init__(channel_path)
         self.pre_fetched_videos = None
 
     def fetch_video(self, fetch_type):
@@ -113,7 +118,7 @@ class TikTokDownloader(BaseTiktokDownloader):
                     print(e)
                     continue
 
-    def fetch_videos(self, fetch_type, cursor="0"):
+    def request_videos(self, cursor="0"):
         '''
          :sort_type: { 0: Relevance, 1: Like Count, 2: Date Posted }
          :publish_time : { 0 - ALL, 1 - Past 24 hours, 7 - This week, 30 - This month, 90 - Last 3 months, 180 - Last 6 months }
@@ -122,11 +127,11 @@ class TikTokDownloader(BaseTiktokDownloader):
         '''
         retry = 0
         api = next(self.api_keys)
-        if fetch_type == 'search' or self.username is False:
-            querystring = {"keywords": self.search_keywords, "count": "20", "cursor": cursor, 'sort_type': 0}
+        if self.search_by == 'keywords':
+            querystring = {"keywords": self.search, "count": "20", "cursor": cursor, 'sort_type': 0}
             url = self.SEARCH_URL
-        elif fetch_type=='username' or self.search_keywords is False:
-            querystring = {"unique_id": self.username, "count": "20", "cursor": cursor}
+        else:
+            querystring = {"unique_id": self.search, "count": "20", "cursor": cursor}
             url = self.USERNAME_URL
         headers = {
             "X-RapidAPI-Key": api,
@@ -145,7 +150,7 @@ class TikTokDownloader(BaseTiktokDownloader):
         except (requests.exceptions.HTTPError, requests.exceptions.RequestException) as e:
             print(f'Error : {e}')
             print(f'RETRY {retry} with another key ..')
-            return self.fetch_videos(fetch_type)
+            return self.request_videos()
 
         except (json.JSONDecodeError, requests.HTTPError) as e:
             print(e)
@@ -348,10 +353,18 @@ class TikTokDownloader(BaseTiktokDownloader):
 
 
     def overwrite_db(self):
-        '''Overwrite with newest VIDEO LIST'''
+        '''
+        Overwrite with newest VIDEO LIST
+        {
+        'search' : '___',
+        'datetime': '',
+        'items' : []
+        }
+        '''
         if self.pre_fetched_videos:
             file_path = os.path.join(self.channel_path, 'prefetched_videos.json')
             data = {
+                "search": str(self.search),
                 'datetime' : str(datetime.now()),
                 'items' : self.pre_fetched_videos
             }
@@ -363,13 +376,17 @@ class TikTokDownloader(BaseTiktokDownloader):
         file_path = os.path.join(self.channel_path, 'prefetched_videos.json')
         try:
             videos = read_json_file(file_path)
+            old_datetime = datetime.strptime(videos.get('datetime', '2022-10-18 12:11:27.554310'),
+                                             '%Y-%m-%d %H:%M:%S.%f')
+            curr_time = datetime.now()
+            if curr_time - old_datetime < timedelta(hours=12) and videos.get('items',
+                                                                             False) and self.search == videos.get(
+                    'search', False):
+                return videos['items']
+            return False
+
         except FileNotFoundError as e:
             return False
-        old_datetime = datetime.strptime(videos.get('datetime', '2022-10-18 12:11:27.554310'), '%Y-%m-%d %H:%M:%S.%f')
-        curr_time = datetime.now()
-        if curr_time - old_datetime < timedelta(hours=12) and videos.get('items', False):
-            return videos['items']
-        return False
 
 
 
