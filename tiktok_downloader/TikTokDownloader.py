@@ -8,6 +8,9 @@ import requests
 import ffmpeg
 from datetime import datetime, timedelta
 from .helper_functions import delete_video, write_to_json, read_json_file
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BaseTiktokDownloader:
     SEARCH_URL = "https://tiktok-video-no-watermark2.p.rapidapi.com/feed/search"
@@ -46,11 +49,11 @@ class BaseTiktokDownloader:
                 self.search = data.get('username', False)
 
         except json.JSONDecodeError as e:
-            print(e)
+            logger.error(e)
             return False
 
         except Exception as e:
-            print(e)
+            logger.error(e)
             return False
 
     def read_json_file(self, filename):
@@ -96,7 +99,7 @@ class TikTokDownloader(BaseTiktokDownloader):
                     raise Exception(f'Title {title} or Video_id {video_id} or URL {url} is none, ')
 
                 if self.is_video_in_db(video_id):
-                    print(f"Skipping : Video '{video_id}' already exists in TikTok")
+                    logger.info(f"Skipping : Video '{video_id}' already exists in TikTok")
                     continue
                 try:
                     generated_filename = self.generate_random_uuid()
@@ -115,7 +118,7 @@ class TikTokDownloader(BaseTiktokDownloader):
                     yield video_data
 
                 except Exception as e:
-                    print(e)
+                    logger.info(e)
                     continue
 
     def request_videos(self, cursor="0"):
@@ -148,12 +151,11 @@ class TikTokDownloader(BaseTiktokDownloader):
             return videos
 
         except (requests.exceptions.HTTPError, requests.exceptions.RequestException) as e:
-            print(f'Error : {e}')
-            print(f'RETRY {retry} with another key ..')
+            logger.info(f'RETRY {retry} with another key .. : {e}')
             return self.request_videos()
 
         except (json.JSONDecodeError, requests.HTTPError) as e:
-            print(e)
+            logger.error(e)
             return []
 
     def download_video(self, url, filename):
@@ -161,10 +163,10 @@ class TikTokDownloader(BaseTiktokDownloader):
             # Download the video and save it to a file
             urllib.request.urlretrieve(url, filename)
             return True
-            print(f"Video {video_id} downloaded!")
+            logger.info(f"Video {video_id} downloaded!")
 
         except Exception as e:
-            print(e)
+            logger.error(e)
             return False
 
     def is_video_in_db(self, video_id):
@@ -326,7 +328,7 @@ class TikTokDownloader(BaseTiktokDownloader):
             return True
         except ffmpeg.Error as e:
             return False
-            print(e)
+            logger.error(e)
 
     def add_metadata(self, file_path):
         #Add a sleep until video i generated
@@ -348,9 +350,9 @@ class TikTokDownloader(BaseTiktokDownloader):
 
                 # Execute the command
                 subprocess.run(command, shell=True)
-                print("Metadata modified successfully.")
+                logger.info("Metadata modified successfully.")
             except Exception as e:
-                print("Error:", str(e))
+                logger.error("Error:", str(e))
 
 
     def overwrite_db(self):
