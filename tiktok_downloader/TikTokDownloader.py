@@ -77,14 +77,14 @@ class TikTokDownloader(BaseTiktokDownloader):
         super().__init__(channel_path)
         self.pre_fetched_videos = None
 
-    def fetch_video(self, fetch_type):
+    def fetch_video(self):
         '''
             - Saves Video response in self.prefetched videos
             - Iterate videos and Yield downloaded Video
         '''
         self.pre_fetched_videos = self.check_prefetched_videos()
         if not self.pre_fetched_videos:
-            self.pre_fetched_videos = self.fetch_videos(fetch_type)
+            self.pre_fetched_videos = self.request_videos()
             self.overwrite_db()
 
         for video_data in self.pre_fetched_videos:
