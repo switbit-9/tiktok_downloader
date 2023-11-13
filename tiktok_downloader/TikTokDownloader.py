@@ -7,7 +7,7 @@ import urllib.request
 import requests
 import ffmpeg
 from datetime import datetime, timedelta
-from helper_functions import delete_video, write_to_json, read_json_file
+from .helper_functions import delete_video, write_to_json, read_json_file
 
 class BaseTiktokDownloader:
     SEARCH_URL = "https://tiktok-video-no-watermark2.p.rapidapi.com/feed/search"
