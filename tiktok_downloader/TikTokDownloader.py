@@ -323,6 +323,7 @@ class TikTokDownloader(BaseTiktokDownloader):
         }
         try:
             ffmpeg.input(input_file).output(output_file, **metadata).run(overwrite_output=True)
+            return True
         except ffmpeg.Error as e:
             return False
             print(e)
