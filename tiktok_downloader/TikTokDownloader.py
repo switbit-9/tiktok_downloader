@@ -15,17 +15,17 @@ logger = logging.getLogger(__name__)
 class BaseTiktokDownloader:
     SEARCH_URL = "https://tiktok-video-no-watermark2.p.rapidapi.com/feed/search"
     USERNAME_URL = "https://tiktok-video-no-watermark2.p.rapidapi.com/user/posts"
-    CHANNELS_FOLDER = 'channels'
     API_KEYS = 'api_keys.json'
     SEARCH_BY_FILE = 'search.json'
 
 
-    def __init__(self, channel_path):
+    def __init__(self, channel, channel_path):
+        self.channel = channel
+        self.channel_path = channel_path
         self.api_key = ''
         self.search_by = ''
         self.search = ''
         self.api_keys = self.load_api_keys()
-        self.channel_path = channel_path
 
         self.load_search_file()
 
@@ -49,11 +49,11 @@ class BaseTiktokDownloader:
                 self.search = data.get('username', False)
 
         except json.JSONDecodeError as e:
-            logger.error(e)
+            logger.error(f"Error {self.channel.upper()} : {e}")
             return False
 
         except Exception as e:
-            logger.error(e)
+            logger.error(f"Error {self.channel.upper()} : {e}")
             return False
 
     def read_json_file(self, filename):
@@ -76,8 +76,8 @@ class BaseTiktokDownloader:
 class TikTokDownloader(BaseTiktokDownloader):
     VIDEO_DB = 'videos_db.json'
 
-    def __init__(self, channel_path):
-        super().__init__(channel_path)
+    def __init__(self, channel, channel_path):
+        super().__init__(channel, channel_path)
         self.pre_fetched_videos = None
 
     def fetch_video(self):
@@ -99,7 +99,7 @@ class TikTokDownloader(BaseTiktokDownloader):
                     raise Exception(f'Title {title} or Video_id {video_id} or URL {url} is none, ')
 
                 if self.is_video_in_db(video_id):
-                    logger.info(f"Skipping : Video '{video_id}' already exists in TikTok")
+                    logger.info(f"Skipping {self.channel.upper()} : Video '{video_id}' already exists in TikTok")
                     continue
                 try:
                     generated_filename = self.generate_random_uuid()
@@ -118,7 +118,7 @@ class TikTokDownloader(BaseTiktokDownloader):
                     yield video_data
 
                 except Exception as e:
-                    logger.info(e)
+                    logger.info(f"{self.channel.upper()} : {e}")
                     continue
 
     def request_videos(self, cursor="0"):
@@ -155,7 +155,7 @@ class TikTokDownloader(BaseTiktokDownloader):
             return self.request_videos()
 
         except (json.JSONDecodeError, requests.HTTPError) as e:
-            logger.error(e)
+            logger.error(f"Error {self.channel.upper()} : {e}")
             return []
 
     def download_video(self, url, filename):
@@ -163,10 +163,10 @@ class TikTokDownloader(BaseTiktokDownloader):
             # Download the video and save it to a file
             urllib.request.urlretrieve(url, filename)
             return True
-            logger.info(f"Video {video_id} downloaded!")
+            logger.info(f"{self.channel.upper()} Video {video_id} downloaded!")
 
         except Exception as e:
-            logger.error(e)
+            logger.error(f"Error {self.channel.upper()} : {e}")
             return False
 
     def is_video_in_db(self, video_id):
@@ -350,9 +350,9 @@ class TikTokDownloader(BaseTiktokDownloader):
 
                 # Execute the command
                 subprocess.run(command, shell=True)
-                logger.info("Metadata modified successfully.")
+                logger.info(f"{self.channel.upper} Metadata modified successfully.")
             except Exception as e:
-                logger.error("Error:", str(e))
+                logger.error(f"Error {self.channel.upper()}:", str(e))
 
 
     def overwrite_db(self):
