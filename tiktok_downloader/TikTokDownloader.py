@@ -121,8 +121,6 @@ class TikTokDownloader(BaseTiktokDownloader):
                     logger.info(f"{self.channel.upper()} : {e}")
                     continue
 
-                finally:
-                    delete_video(downloaded_video)
 
     def request_videos(self, cursor="0"):
         '''
